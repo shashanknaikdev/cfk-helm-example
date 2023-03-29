@@ -1,0 +1,8 @@
+apiVersion: v2
+name: apply-cfk-acls
+description: Helm chart to deploy a k8s job to apply acls for Confluent Platform components
+
+type: application
+
+#Chart version
+version: 1.0.0

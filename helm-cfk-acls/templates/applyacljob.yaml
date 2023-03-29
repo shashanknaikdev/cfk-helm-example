@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: applyacljob
+spec:
+  template:
+    spec:
+      volumes:
+      - name: acl-configmap-volume
+        configMap:
+          name: aclconfigmap
+          defaultMode: 0775
+      - name: kafka-generated-jks
+        secret:
+          secretName: kafka-generated-jks
+          optional: false
+      containers:
+      - name: cp-server
+        image: confluentinc/cp-server:{{ .Values.configurationOverrides.global.imageTag }}
+        command: ['sh', '-c', '/tmp/acl.sh']
+        volumeMounts:
+        - name: acl-configmap-volume
+          mountPath: /tmp
+        - name: kafka-generated-jks
+          mountPath: /tmp/certs
+      restartPolicy: OnFailure
+      initContainers:
+      - name: init-myservice
+        image: busybox:1.28
+        command: ['sh', '-c', "until nslookup kafka.{{ .Values.configurationOverrides.global.namespace }}.svc.cluster.local; do echo waiting for kafka to start; sleep 5; done"]
+  backoffLimit: 4

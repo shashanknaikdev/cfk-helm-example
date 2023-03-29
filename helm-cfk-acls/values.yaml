@@ -1,0 +1,7 @@
+# Declare variables to be passed into your templates
+
+configurationOverrides:
+  global: 
+    namespace: confluent
+    imageTag: 7.3.0
+    initTag: 2.5.0

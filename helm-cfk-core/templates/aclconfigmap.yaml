@@ -1,0 +1,244 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aclconfigmap
+  namespace: {{ .Values.configurationOverrides.global.namespace }}
+data:
+  acl.sh: |
+    until zookeeper-shell zookeeper:2181 get /kafka-confluent/cluster/id 2>/dev/null
+    do
+        echo "waiting for zookeeper shell"
+        sleep 10
+    done
+    clusterid=$(zookeeper-shell zookeeper.confluent.svc.cluster.local:2181 get /kafka-confluent/cluster/id | cut -d \" -f 8 | tail -1)
+    namespace=$(getent hosts kafka | tail -1 | awk '{print $NF}' | cut -d '.' -f2)
+    echo "The namespace is $namespace and the cluster id is $clusterid"
+
+    echo "the path mnt contains" 
+    ls /tmp/certs
+
+    cat <<EOF>~/client.properties
+    bootstrap.servers=kafka.confluent.svc.cluster.local:9071
+    security.protocol=SSL
+    ssl.truststore.location=/tmp/certs/truststore.jks
+    ssl.truststore.password=mystorepassword
+    ssl.keystore.location=/tmp/certs/keystore.jks
+    ssl.keystore.password=mystorepassword
+    EOF
+
+    ls ~
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:schemaregistry" \
+    --operation Read --operation Write --operation Create \
+    --topic _confluent-license
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:schemaregistry" \
+    --operation Describe \
+    --topic __consumer_offsets \
+    --topic _confluent-metrics \
+    --topic _confluent-telemetry-metrics \
+    --topic _confluent-command \
+    --topic _confluent-monitoring \
+    --topic confluent.connect-configs \
+    --topic confluent.connect-offsets \
+    --topic confluent.connect-status \
+    --topic _confluent-ksql-confluent.ksqldb__command_topic
+    
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:schemaregistry" \
+    --operation Describe \
+    --topic _confluent_balancer \
+    --topic _confluent-controlcenter \
+    --resource-pattern-type prefixed
+
+    ### The schemas topic is named: _schemas_<sr-cluster-name>_<namespace>
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:schemaregistry" \
+    --operation Read --operation Write --operation Create --operation DescribeConfigs --operation Describe \
+    --topic _schemas_schemaregistry_confluent
+
+    ### The Schema Registry consumer group is: id_<sr-cluster-name>_<namespace>
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:schemaregistry" \
+    --operation Read \
+    --group id_schemaregistry_confluent
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:schemaregistry" \
+    --operation ClusterAction \
+    --cluster $clusterid
+
+    # For Connect
+
+    ### The Connect topic prefix is: <namespace>.<connect-cluster-name>-
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:connect" \
+    --operation Read --operation Write --operation Create \
+    --topic confluent.connect- \
+    --resource-pattern-type prefixed
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:connect" \
+    --operation Write \
+    --topic _confluent-monitoring \
+    --resource-pattern-type prefixed
+
+    ### The Connect consumer group is: <namespace>.<connect-cluster-name>
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:connect" \
+    --operation Read \
+    --group *
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:connect" \
+    --operation Create --operation ClusterAction \
+    --cluster $clusterid
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:connect" \
+    --operation Describe \
+    --topic _confluent-controlcenter \
+    --resource-pattern-type prefixed
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:connect" \
+    --operation Describe \
+    --topic __consumer_offsets \
+    --topic _confluent-command \
+    --topic _confluent-ksql-confluent.ksqldb__command_topic \
+    --topic _confluent-license \
+    --topic _confluent-metrics \
+    --topic _confluent-telemetry-metrics \
+    --topic _confluent_balancer_api_state \
+    --topic _confluent_balancer_broker_samples \
+    --topic _confluent_balancer_partition_samples \
+    --topic _schemas_schemaregistry_confluent \
+    --topic confluent.connect-offsets
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:connect" \
+    --operation Describe \
+    --operation Read \
+    --operation Write \
+    --topic _confluent-command
+
+    # For ksqlDB
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:ksqldb" \
+    --operation Read --operation Write --operation Create \
+    --topic app1_ \
+    --resource-pattern-type prefixed
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:ksqldb" \
+    --operation All \
+    --topic _confluent-ksql-confluent \
+    --resource-pattern-type prefixed
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:ksqldb" \
+    --operation Describe \
+    --cluster $clusterid
+    
+    # For Control Center
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation Read --operation Write --operation Create --operation Alter --operation AlterConfigs --operation Delete \
+    --topic _confluent-controlcenter \
+    --resource-pattern-type prefixed
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation Read --operation Write --operation Create \
+    --topic _confluent-command
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation Read --operation Write --operation Create --operation DescribeConfigs --operation Describe \
+    --topic _confluent-metrics
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation Read --operation Write --operation Create --operation DescribeConfigs --operation Describe --operation Alter --operation AlterConfigs --operation Delete \
+    --topic _confluent-monitoring \
+    --topic _confluent-telemetry-metrics \
+    --topic confluent.connect-configs \
+    --topic confluent.connect-offsets \
+    --topic confluent.connect-status \
+    --topic __consumer_offsets
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation Describe --operation Alter --operation AlterConfigs --operation Create --operation Delete --operation DescribeConfigs \
+    --topic _confluent_balancer_api_state \
+    --topic _confluent_balancer_broker_samples \
+    --topic _confluent_balancer_partition_samples \
+    --topic _confluent-command \
+    --topic _confluent-ksql-confluent.ksqldb__command_topic \
+    --topic _confluent-license \
+    --topic _confluent-telemetry-metrics \
+    --topic _schemas_schemaregistry_confluent
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation DescribeConfigs \
+    --topic _confluent-command
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation DescribeConfigs \
+    --topic _confluent-controlcenter \
+    --resource-pattern-type prefixed
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation AlterConfigs --operation Create --operation Describe --operation DescribeConfigs --operation Describe --operation ClusterAction \
+    --cluster $clusterid
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation AlterConfigs --operation Create --operation Describe --operation DescribeConfigs --operation Create \
+    --cluster $clusterid
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation Describe --operation Delete --operation Read \
+    --group ConfluentTelemetryReporterSampler \
+    --resource-pattern-type prefixed
+
+    /bin/kafka-acls --bootstrap-server kafka.$namespace.svc.cluster.local:9071 --command-config ~/client.properties \
+    --add \
+    --allow-principal "User:controlcenter" \
+    --operation All \
+    --group _confluent-controlcenter \
+    --resource-pattern-type prefixed

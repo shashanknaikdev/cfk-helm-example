@@ -1,0 +1,8 @@
+apiVersion: v2
+name: cfk-addons
+description: Helm chart to deploy a Confluent Platform addon components - Schema Registry, Connect, ksqlDB, ControlCenter, etc
+
+type: application
+
+#Chart version
+version: 1.0.0

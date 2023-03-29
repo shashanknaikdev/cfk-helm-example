@@ -1,0 +1,22 @@
+# Declare variables to be passed into your templates
+
+configurationOverrides:
+  global: 
+    namespace: confluent
+    imageTag: 7.3.0
+    initTag: 2.5.0
+
+  schemaregistry:
+    replicas: 1
+
+  connect:
+    replicas: 1
+
+  ksqldb:
+    replicas: 1
+    dataVolumeCapacity: 10G
+
+  controlcenter:
+    replicas: 1
+    dataVolumeCapacity: 10G
+

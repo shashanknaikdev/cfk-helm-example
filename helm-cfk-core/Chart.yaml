@@ -1,0 +1,8 @@
+apiVersion: v2
+name: cfk-core
+description: Helm chart to deploy a Confluent Platform core components - Kafka brokers and zookeeper
+
+type: application
+
+#Chart version
+version: 1.0.0
